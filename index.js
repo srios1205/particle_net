@@ -1,352 +1,205 @@
-var w = c.width = window.innerWidth,
-h = c.height = window.innerHeight,
-ctx = c.getContext( '2d' ),
+// particle.min.js hosted on GitHub
+// Scroll down for initialisation code
 
-opts = {
-    
-    range: 180,
-    baseConnections: 3,
-    addedConnections: 5,
-    baseSize: 5,
-    minSize: 1,
-    dataToConnectionSize: .4,
-    sizeMultiplier: .7,
-    allowedDist: 40,
-    baseDist: 40,
-    addedDist: 30,
-    connectionAttempts: 100,
-    
-    dataToConnections: 1,
-    baseSpeed: .04,
-    addedSpeed: .05,
-    baseGlowSpeed: .4,
-    addedGlowSpeed: .4,
-    
-    rotVelX: .003,
-    rotVelY: .002,
-    
-    repaintColor: '#111',
-    connectionColor: 'hsla(200,60%,light%,alp)',
-    rootColor: 'hsla(0,60%,light%,alp)',
-    endColor: 'hsla(160,20%,light%,alp)',
-    dataColor: 'hsla(40,80%,light%,alp)',
-    
-    wireframeWidth: .1,
-    wireframeColor: '#88f',
-    
-    depth: 250,
-    focalLength: 250,
-    vanishPoint: {
-        x: w / 2,
-        y: h / 2
+!function(a) {
+    var b = "object" == typeof self && self.self === self && self || "object" == typeof global && global.global === global && global;
+    "function" == typeof define && define.amd ? define(["exports"], function(c) {
+        b.ParticleNetwork = a(b, c)
+    }) : "object" == typeof module && module.exports ? module.exports = a(b, {}) : b.ParticleNetwork = a(b, {})
+}(function(a, b) {
+    var c = function(a) {
+        this.canvas = a.canvas,
+        this.g = a.g,
+        this.particleColor = a.options.particleColor,
+        this.x = Math.random() * this.canvas.width,
+        this.y = Math.random() * this.canvas.height,
+        this.velocity = {
+            x: (Math.random() - .5) * a.options.velocity,
+            y: (Math.random() - .5) * a.options.velocity
+        }
+    };
+    return c.prototype.update = function() {
+        (this.x > this.canvas.width + 20 || this.x < -20) && (this.velocity.x = -this.velocity.x),
+        (this.y > this.canvas.height + 20 || this.y < -20) && (this.velocity.y = -this.velocity.y),
+        this.x += this.velocity.x,
+        this.y += this.velocity.y
     }
-},
-
-squareRange = opts.range * opts.range,
-squareAllowed = opts.allowedDist * opts.allowedDist,
-mostDistant = opts.depth + opts.range,
-sinX = sinY = 0,
-cosX = cosY = 0,
-
-connections = [],
-toDevelop = [],
-data = [],
-all = [],
-tick = 0,
-totalProb = 0,
-
-animating = false,
-
-Tau = Math.PI * 2;
-
-ctx.fillStyle = '#222';
-ctx.fillRect( 0, 0, w, h );
-ctx.fillStyle = '#ccc';
-ctx.font = '50px Verdana';
-ctx.fillText( 'Calculating Nodes', w / 2 - ctx.measureText( 'Calculating Nodes' ).width / 2, h / 2 - 15 );
-
-window.setTimeout( init, 4 ); // to render the loading screen
-
-function init(){
-
-connections.length = 0;
-data.length = 0;
-all.length = 0;
-toDevelop.length = 0;
-
-var connection = new Connection( 0, 0, 0, opts.baseSize );
-connection.step = Connection.rootStep;
-connections.push( connection );
-all.push( connection );
-connection.link();
-
-while( toDevelop.length > 0 ){
-
-toDevelop[ 0 ].link();
-toDevelop.shift();
-}
-
-if( !animating ){
-animating = true;
-anim();
-}
-}
-function Connection( x, y, z, size ){
-
-this.x = x;
-this.y = y;
-this.z = z;
-this.size = size;
-
-this.screen = {};
-
-this.links = [];
-this.probabilities = [];
-this.isEnd = false;
-
-this.glowSpeed = opts.baseGlowSpeed + opts.addedGlowSpeed * Math.random();
-}
-Connection.prototype.link = function(){
-
-if( this.size < opts.minSize )
-return this.isEnd = true;
-
-var links = [],
-    connectionsNum = opts.baseConnections + Math.random() * opts.addedConnections |0,
-    attempt = opts.connectionAttempts,
-    
-    alpha, beta, len,
-    cosA, sinA, cosB, sinB,
-    pos = {},
-    passedExisting, passedBuffered;
-
-while( links.length < connectionsNum && --attempt > 0 ){
-
-alpha = Math.random() * Math.PI;
-beta = Math.random() * Tau;
-len = opts.baseDist + opts.addedDist * Math.random();
-
-cosA = Math.cos( alpha );
-sinA = Math.sin( alpha );
-cosB = Math.cos( beta );
-sinB = Math.sin( beta );
-
-pos.x = this.x + len * cosA * sinB;
-pos.y = this.y + len * sinA * sinB;
-pos.z = this.z + len *        cosB;
-
-if( pos.x*pos.x + pos.y*pos.y + pos.z*pos.z < squareRange ){
-
-    passedExisting = true;
-    passedBuffered = true;
-    for( var i = 0; i < connections.length; ++i )
-        if( squareDist( pos, connections[ i ] ) < squareAllowed )
-            passedExisting = false;
-
-    if( passedExisting )
-        for( var i = 0; i < links.length; ++i )
-            if( squareDist( pos, links[ i ] ) < squareAllowed )
-                passedBuffered = false;
-
-    if( passedExisting && passedBuffered )
-        links.push( { x: pos.x, y: pos.y, z: pos.z } );
-    
-}
-
-}
-
-if( links.length === 0 )
-this.isEnd = true;
-else {
-for( var i = 0; i < links.length; ++i ){
-    
-    var pos = links[ i ],
-            connection = new Connection( pos.x, pos.y, pos.z, this.size * opts.sizeMultiplier );
-    
-    this.links[ i ] = connection;
-    all.push( connection );
-    connections.push( connection );
-}
-for( var i = 0; i < this.links.length; ++i )
-    toDevelop.push( this.links[ i ] );
-}
-}
-Connection.prototype.step = function(){
-
-this.setScreen();
-this.screen.color = ( this.isEnd ? opts.endColor : opts.connectionColor ).replace( 'light', 30 + ( ( tick * this.glowSpeed ) % 30 ) ).replace( 'alp', .2 + ( 1 - this.screen.z / mostDistant ) * .8 );
-
-for( var i = 0; i < this.links.length; ++i ){
-ctx.moveTo( this.screen.x, this.screen.y );
-ctx.lineTo( this.links[ i ].screen.x, this.links[ i ].screen.y );
-}
-}
-Connection.rootStep = function(){
-this.setScreen();
-this.screen.color = opts.rootColor.replace( 'light', 30 + ( ( tick * this.glowSpeed ) % 30 ) ).replace( 'alp', ( 1 - this.screen.z / mostDistant ) * .8 );
-
-for( var i = 0; i < this.links.length; ++i ){
-ctx.moveTo( this.screen.x, this.screen.y );
-ctx.lineTo( this.links[ i ].screen.x, this.links[ i ].screen.y );
-}
-}
-Connection.prototype.draw = function(){
-ctx.fillStyle = this.screen.color;
-ctx.beginPath();
-ctx.arc( this.screen.x, this.screen.y, this.screen.scale * this.size, 0, Tau );
-ctx.fill();
-}
-function Data( connection ){
-
-this.glowSpeed = opts.baseGlowSpeed + opts.addedGlowSpeed * Math.random();
-this.speed = opts.baseSpeed + opts.addedSpeed * Math.random();
-
-this.screen = {};
-
-this.setConnection( connection );
-}
-Data.prototype.reset = function(){
-
-this.setConnection( connections[ 0 ] );
-this.ended = 2;
-}
-Data.prototype.step = function(){
-
-this.proportion += this.speed;
-
-if( this.proportion < 1 ){
-this.x = this.ox + this.dx * this.proportion;
-this.y = this.oy + this.dy * this.proportion;
-this.z = this.oz + this.dz * this.proportion;
-this.size = ( this.os + this.ds * this.proportion ) * opts.dataToConnectionSize;
-} else 
-this.setConnection( this.nextConnection );
-
-this.screen.lastX = this.screen.x;
-this.screen.lastY = this.screen.y;
-this.setScreen();
-this.screen.color = opts.dataColor.replace( 'light', 40 + ( ( tick * this.glowSpeed ) % 50 ) ).replace( 'alp', .2 + ( 1 - this.screen.z / mostDistant ) * .6 );
-
-}
-Data.prototype.draw = function(){
-
-if( this.ended )
-return --this.ended; // not sre why the thing lasts 2 frames, but it does
-
-ctx.beginPath();
-ctx.strokeStyle = this.screen.color;
-ctx.lineWidth = this.size * this.screen.scale;
-ctx.moveTo( this.screen.lastX, this.screen.lastY );
-ctx.lineTo( this.screen.x, this.screen.y );
-ctx.stroke();
-}
-Data.prototype.setConnection = function( connection ){
-
-if( connection.isEnd )
-this.reset();
-
-else {
-
-this.connection = connection;
-this.nextConnection = connection.links[ connection.links.length * Math.random() |0 ];
-
-this.ox = connection.x; // original coordinates
-this.oy = connection.y;
-this.oz = connection.z;
-this.os = connection.size; // base size
-
-this.nx = this.nextConnection.x; // new
-this.ny = this.nextConnection.y;
-this.nz = this.nextConnection.z;
-this.ns = this.nextConnection.size;
-
-this.dx = this.nx - this.ox; // delta
-this.dy = this.ny - this.oy;
-this.dz = this.nz - this.oz;
-this.ds = this.ns - this.os;
-
-this.proportion = 0;
-}
-}
-Connection.prototype.setScreen = Data.prototype.setScreen = function(){
-
-var x = this.x,
-    y = this.y,
-    z = this.z;
-
-// apply rotation on X axis
-var Y = y;
-y = y * cosX - z * sinX;
-z = z * cosX + Y * sinX;
-
-// rot on Y
-var Z = z;
-z = z * cosY - x * sinY;
-x = x * cosY + Z * sinY;
-
-this.screen.z = z;
-
-// translate on Z
-z += opts.depth;
-
-this.screen.scale = opts.focalLength / z;
-this.screen.x = opts.vanishPoint.x + x * this.screen.scale;
-this.screen.y = opts.vanishPoint.y + y * this.screen.scale;
-
-}
-function squareDist( a, b ){
-
-var x = b.x - a.x,
-    y = b.y - a.y,
-    z = b.z - a.z;
-
-return x*x + y*y + z*z;
-}
-
-function anim(){
-
-window.requestAnimationFrame( anim );
-
-ctx.globalCompositeOperation = 'source-over';
-ctx.fillStyle = opts.repaintColor;
-ctx.fillRect( 0, 0, w, h );
-
-++tick;
-
-var rotX = tick * opts.rotVelX,
-    rotY = tick * opts.rotVelY;
-
-cosX = Math.cos( rotX );
-sinX = Math.sin( rotX );
-cosY = Math.cos( rotY );
-sinY = Math.sin( rotY );
-
-if( data.length < connections.length * opts.dataToConnections ){
-var datum = new Data( connections[ 0 ] );
-data.push( datum );
-all.push( datum );
-}
-
-ctx.globalCompositeOperation = 'lighter';
-ctx.beginPath();
-ctx.lineWidth = opts.wireframeWidth;
-ctx.strokeStyle = opts.wireframeColor;
-all.map( function( item ){ item.step(); } );
-ctx.stroke();
-ctx.globalCompositeOperation = 'source-over';
-all.sort( function( a, b ){ return b.screen.z - a.screen.z } );
-all.map( function( item ){ item.draw(); } );
-
-/*ctx.beginPath();
-ctx.strokeStyle = 'red';
-ctx.arc( opts.vanishPoint.x, opts.vanishPoint.y, opts.range * opts.focalLength / opts.depth, 0, Tau );
-ctx.stroke();*/
-}
-
-window.addEventListener( 'resize', function(){
-
-opts.vanishPoint.x = ( w = c.width = window.innerWidth ) / 2;
-opts.vanishPoint.y = ( h = c.height = window.innerHeight ) / 2;
-ctx.fillRect( 0, 0, w, h );
+    ,
+    c.prototype.h = function() {
+        this.g.beginPath(),
+        this.g.fillStyle = this.particleColor,
+        this.g.globalAlpha = .7,
+        this.g.arc(this.x, this.y, 1.5, 0, 2 * Math.PI),
+        this.g.fill()
+    }
+    ,
+    b = function(a, b) {
+        this.i = a,
+        this.i.size = {
+            width: this.i.offsetWidth,
+            height: this.i.offsetHeight
+        },
+        b = void 0 !== b ? b : {},
+        this.options = {
+            particleColor: void 0 !== b.particleColor ? b.particleColor : "#fff",
+            background: void 0 !== b.background ? b.background : "#1a252f",
+            interactive: void 0 !== b.interactive ? b.interactive : !0,
+            velocity: this.setVelocity(b.speed),
+            density: this.j(b.density)
+        },
+        this.init()
+    }
+    ,
+    b.prototype.init = function() {
+        if (this.k = document.createElement("div"),
+        this.i.appendChild(this.k),
+        this.l(this.k, {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: 0,
+            "z-index": 1
+        }),
+        /(^#[0-9A-F]{6}$)|(^#[0-9A-F]{3}$)/i.test(this.options.background))
+            this.l(this.k, {
+                background: this.options.background
+            });
+        else {
+            if (!/\.(gif|jpg|jpeg|tiff|png)$/i.test(this.options.background))
+                return console.error("Please specify a valid background image or hexadecimal color"),
+                !1;
+            this.l(this.k, {
+                background: 'url("' + this.options.background + '") no-repeat center',
+                "background-size": "cover"
+            })
+        }
+        if (!/(^#[0-9A-F]{6}$)|(^#[0-9A-F]{3}$)/i.test(this.options.particleColor))
+            return console.error("Please specify a valid particleColor hexadecimal color"),
+            !1;
+        this.canvas = document.createElement("canvas"),
+        this.i.appendChild(this.canvas),
+        this.g = this.canvas.getContext("2d"),
+        this.canvas.width = this.i.size.width,
+        this.canvas.height = this.i.size.height,
+        this.l(this.i, {
+            position: "relative"
+        }),
+        this.l(this.canvas, {
+            "z-index": "20",
+            position: "relative"
+        }),
+        window.addEventListener("resize", function() {
+            return this.i.offsetWidth === this.i.size.width && this.i.offsetHeight === this.i.size.height ? !1 : (this.canvas.width = this.i.size.width = this.i.offsetWidth,
+            this.canvas.height = this.i.size.height = this.i.offsetHeight,
+            clearTimeout(this.m),
+            void (this.m = setTimeout(function() {
+                this.o = [];
+                for (var a = 0; a < this.canvas.width * this.canvas.height / this.options.density; a++) {
+                    if (window.CP.shouldStopExecution(1)) {
+                        break;
+                    }
+                    this.o.push(new c(this));
+                    window.CP.exitedLoop(1);
+                }
+                this.options.interactive && this.o.push(this.p),
+                requestAnimationFrame(this.update.bind(this))
+            }
+            .bind(this), 500)))
+        }
+        .bind(this)),
+        this.o = [];
+        for (var a = 0; a < this.canvas.width * this.canvas.height / this.options.density; a++) {
+            if (window.CP.shouldStopExecution(2)) {
+                break;
+            }
+            this.o.push(new c(this));
+        }
+        window.CP.exitedLoop(2);
+        this.options.interactive && (this.p = new c(this),
+        this.p.velocity = {
+            x: 0,
+            y: 0
+        },
+        this.o.push(this.p),
+        this.canvas.addEventListener("mousemove", function(a) {
+            this.p.x = a.clientX - this.canvas.offsetLeft,
+            this.p.y = a.clientY - this.canvas.offsetTop
+        }
+        .bind(this)),
+        this.canvas.addEventListener("mouseup", function(a) {
+            this.p.velocity = {
+                x: (Math.random() - .5) * this.options.velocity,
+                y: (Math.random() - .5) * this.options.velocity
+            },
+            this.p = new c(this),
+            this.p.velocity = {
+                x: 0,
+                y: 0
+            },
+            this.o.push(this.p)
+        }
+        .bind(this))),
+        requestAnimationFrame(this.update.bind(this))
+    }
+    ,
+    b.prototype.update = function() {
+        this.g.clearRect(0, 0, this.canvas.width, this.canvas.height),
+        this.g.globalAlpha = 1;
+        for (var a = 0; a < this.o.length; a++) {
+            if (window.CP.shouldStopExecution(4)) {
+                break;
+            }
+            this.o[a].update(),
+            this.o[a].h();
+            for (var b = this.o.length - 1; b > a; b--) {
+                if (window.CP.shouldStopExecution(3)) {
+                    break;
+                }
+                var c = Math.sqrt(Math.pow(this.o[a].x - this.o[b].x, 2) + Math.pow(this.o[a].y - this.o[b].y, 2));
+                c > 120 || (this.g.beginPath(),
+                this.g.strokeStyle = this.options.particleColor,
+                this.g.globalAlpha = (120 - c) / 120,
+                this.g.lineWidth = .7,
+                this.g.moveTo(this.o[a].x, this.o[a].y),
+                this.g.lineTo(this.o[b].x, this.o[b].y),
+                this.g.stroke())
+            }
+            window.CP.exitedLoop(3);
+        }
+        window.CP.exitedLoop(4);
+        0 !== this.options.velocity && requestAnimationFrame(this.update.bind(this))
+    }
+    ,
+    b.prototype.setVelocity = function(a) {
+        return "fast" === a ? 1 : "slow" === a ? .33 : "none" === a ? 0 : .66
+    }
+    ,
+    b.prototype.j = function(a) {
+        return "high" === a ? 5e3 : "low" === a ? 2e4 : isNaN(parseInt(a, 10)) ? 1e4 : a
+    }
+    ,
+    b.prototype.l = function(a, b) {
+        for (var c in b) {
+            if (window.CP.shouldStopExecution(5)) {
+                break;
+            }
+            a.style[c] = b[c]
+        }
+        window.CP.exitedLoop(5);
+    }
+    ,
+    b
 });
-window.addEventListener( 'click', init );
+
+// Initialisation
+
+var canvasDiv = document.getElementById('particle-canvas');
+var options = {
+    particleColor: '#888',
+    background: 'https://raw.githubusercontent.com/JulianLaval/canvas-particle-network/master/img/demo-bg.jpg',
+    interactive: true,
+    speed: 'medium',
+    density: 'high'
+};
+var particleCanvas = new ParticleNetwork(canvasDiv,options);
